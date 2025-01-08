@@ -15,13 +15,25 @@ export class TelegramClient {
     constructor(runtime: IAgentRuntime, botToken: string) {
         elizaLogger.log("📱 Constructing new TelegramClient...");
         this.runtime = runtime;
-        this.bot = new Telegraf(botToken);
-        this.messageManager = new MessageManager(this.bot, this.runtime);
+ //       this.bot = new Telegraf(botToken);
+
+ this.bot = new Telegraf(botToken, {
+    handlerTimeout: 90000, // 90 seconds for request handling
+});
+
+
+         this.messageManager = new MessageManager(this.bot, this.runtime);
         this.backend = runtime.getSetting("BACKEND_URL");
         this.backendToken = runtime.getSetting("BACKEND_TOKEN");
         this.tgTrader = runtime.getSetting("TG_TRADER"); // boolean To Be added to the settings
         elizaLogger.log("✅ TelegramClient constructor completed");
     }
+
+
+
+
+
+
 
     public async start(): Promise<void> {
         elizaLogger.log("🚀 Starting Telegram bot...");
@@ -35,18 +47,70 @@ export class TelegramClient {
         }
     }
 
-    private async initializeBot(): Promise<void> {
-        this.bot.launch({ dropPendingUpdates: true });
-        elizaLogger.log(
-            "✨ Telegram bot successfully launched and is running!"
-        );
+    // private async initializeBot(): Promise<void> {
+    //     this.bot.launch({ dropPendingUpdates: true });
+    //     elizaLogger.log(
+    //         "✨ Telegram bot successfully launched and is running!"
+    //     );
 
+    //     const botInfo = await this.bot.telegram.getMe();
+    //     this.bot.botInfo = botInfo;
+    //     elizaLogger.success(`Bot username: @${botInfo.username}`);
+
+    //     this.messageManager.bot = this.bot;
+    // }
+
+
+
+    private async initializeBot(): Promise<void> {
+        const maxRetries = 3;
+        let retries = 0;
+
+        while (retries < maxRetries) {
+            try {
+                // Get bot info first to verify API connectivity
+                const botInfo = await this.bot.telegram.getMe();
+                this.bot.botInfo = botInfo;
+                elizaLogger.success(`Bot username: @${botInfo.username}`);
+
+                // Then launch the bot
+                await this.bot.launch({ dropPendingUpdates: true });
+                elizaLogger.log("✨ Telegram bot successfully launched and is running!");
+
+                this.messageManager.bot = this.bot;
+                return;
+            } catch (error) {
+                retries++;
+                if (retries === maxRetries) {
+                    elizaLogger.error(`Failed to initialize bot after ${maxRetries} attempts:`, error);
+                    throw error;
+                }
+                elizaLogger.warn(`Initialization attempt ${retries} failed, retrying in 5 seconds...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+    }
+
+
+
+
+/*     private async initializeBot(): Promise<void> {
+        // First get the bot info
         const botInfo = await this.bot.telegram.getMe();
         this.bot.botInfo = botInfo;
         elizaLogger.success(`Bot username: @${botInfo.username}`);
 
+        // Then launch the bot after we confirm API connectivity
+        await this.bot.launch({ dropPendingUpdates: true });
+        elizaLogger.log("✨ Telegram bot successfully launched and is running!");
+
         this.messageManager.bot = this.bot;
     }
+ */
+
+
+
+
 
     private async isGroupAuthorized(ctx: Context): Promise<boolean> {
         const config = this.runtime.character.clientConfig?.telegram;
