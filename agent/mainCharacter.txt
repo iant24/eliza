@@ -1,0 +1,9 @@
+   import { DefaultCharacter } from "./eliza/packages/core/src/defaultCharacter.ts";
+   import { clients } from "../globalClients";
+   import { modelProviders } from "../modelProviders";
+
+   export const mainCharacter = {
+      ...DefaultCharacter,
+      clients: { twitter: clients.twitter },
+      modelProvider: modelProviders.anthropic
+   };
